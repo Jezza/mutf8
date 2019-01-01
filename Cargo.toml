@@ -1,12 +1,12 @@
 [package]
 name = "mutf8"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Jezza <jezzadabomb@gmail.com>"]
 edition = "2018"
 description = "Basic support for mutf8 strings."
 readme = "README.md"
 license = "MIT"
 repository = "https://github.com/Jezza/mutf8"
-keywords = ["mutf8", "string", "encoding"]
+keywords = ["mutf8", "string", "encoding", "modified-utf8"]
 
 [dependencies]

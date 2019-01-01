@@ -2,20 +2,40 @@ extern crate mutf8;
 
 use mutf8::{MString, mstr};
 
-#[test]
-fn test() {
-	let t = MString::new();
-	method(&t, &t);
-//	let value = "test".into();
-//	method(&value, &value);
-//	let data = "test".into_boxed_bytes();
-//	let t = MStr::from_utf8(data.as_ref());
-//	println("{:?}", L);
-//	method(t);
+macro_rules! assert_owned {
+    ($var:ident, $msg:expr) => {
+		{
+			use std::borrow::Cow;
+			if let Cow::Borrowed(_) = $var {
+				panic!($msg)
+			}
+		}    
+    };
 }
 
-use std::convert::AsRef;
-fn method(value0: impl AsRef<mstr>, value1: impl AsRef<mstr>) {
-	println!("{:?}", value0.as_ref());
-	println!("{:?}", value1.as_ref());
+macro_rules! assert_borrowed {
+    ($var:ident, $msg:expr) => {
+		{
+			use std::borrow::Cow;
+			if let Cow::Owned(_) = $var {
+				panic!($msg)
+			}
+		}    
+    };
+}
+
+#[test]
+fn ascii_test() {
+	let data = mstr::from_utf8(b"value");
+	assert_eq!(data.len(), 5);
+
+	assert_borrowed!(data, "Data not borrowed. [It's just pure ascii which uses the same encoding as utf8]");
+}
+
+#[test]
+fn nul_test() {
+	let data = mstr::from_utf8(b"\0");
+	assert_eq!(data.len(), 2);
+
+	assert_owned!(data, "Data not owned. [A nul byte needs two bytes in mutf8]");
 }
