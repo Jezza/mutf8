@@ -1,0 +1,3 @@
+hard_tabs = true
+imports_layout = "HorizontalVertical"
+newline_style = "Unix"

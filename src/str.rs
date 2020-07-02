@@ -1,30 +1,16 @@
-use std::borrow::{
-	Borrow,
-	Cow,
-	ToOwned,
-};
-use std::fmt::{
-	Debug,
-	Formatter,
-	Result as FResult,
-};
+use std::borrow::{Borrow, Cow, ToOwned};
+use std::fmt::{Debug, Formatter, Result as FResult};
 use std::ops::Deref;
 
-use crate::utf8_to_mutf8;
 use crate::mutf8_to_utf8;
+use crate::utf8_to_mutf8;
 
 #[cfg(feature = "serde")]
-use serde::{
-	Deserialize,
-	Serialize,
-	Serializer,
-	Deserializer,
-	de::SeqAccess
-};
+use serde::{de::SeqAccess, Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Eq, PartialEq, Hash, Clone)]
 pub struct MString {
-	inner: Box<[u8]>
+	inner: Box<[u8]>,
 }
 
 impl MString {
@@ -33,9 +19,7 @@ impl MString {
 			Cow::Borrowed(_data) => input.into(),
 			Cow::Owned(data) => data.into_boxed_slice(),
 		};
-		MString {
-			inner: boxed_data
-		}
+		MString { inner: boxed_data }
 	}
 
 	pub fn from_mutf8(input: impl Into<Box<[u8]>>) -> MString {
@@ -46,7 +30,7 @@ impl MString {
 
 	pub unsafe fn from_mutf8_unchecked<T: Into<Vec<u8>>>(t: T) -> MString {
 		MString {
-			inner: t.into().into_boxed_slice()
+			inner: t.into().into_boxed_slice(),
 		}
 	}
 
@@ -111,10 +95,12 @@ impl MString {
 	}
 }
 
-
 #[cfg(feature = "serde")]
 impl Serialize for MString {
-	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: Serializer,
+	{
 		serializer.serialize_bytes(&self.inner)
 	}
 }
@@ -130,7 +116,10 @@ impl<'de> serde::de::Visitor<'de> for MStringVisitor {
 		formatter.write_str("mutf8 bytes")
 	}
 
-	fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error> where A: SeqAccess<'de>, {
+	fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+	where
+		A: SeqAccess<'de>,
+	{
 		let mut data = vec![];
 		while let Some(val) = seq.next_element::<u8>()? {
 			data.push(val);
@@ -138,14 +127,20 @@ impl<'de> serde::de::Visitor<'de> for MStringVisitor {
 		Ok(MString::from_mutf8(data))
 	}
 
-	fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E> where E: serde::de::Error {
+	fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+	where
+		E: serde::de::Error,
+	{
 		Ok(MString::from_mutf8(v))
 	}
 }
 
 #[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for MString {
-	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+	where
+		D: Deserializer<'de>,
+	{
 		deserializer.deserialize_bytes(MStringVisitor)
 	}
 }
@@ -198,9 +193,7 @@ impl mstr {
 	}
 
 	pub fn from_mutf8(bytes: &[u8]) -> &mstr {
-		unsafe {
-			std::mem::transmute(bytes)
-		}
+		unsafe { std::mem::transmute(bytes) }
 	}
 
 	/// Returns the length of the string, in bytes.
@@ -257,7 +250,9 @@ impl mstr {
 
 	pub fn into_m_string(self: Box<mstr>) -> MString {
 		let raw = Box::into_raw(self) as *mut [u8];
-		MString { inner: unsafe { Box::from_raw(raw) } }
+		MString {
+			inner: unsafe { Box::from_raw(raw) },
+		}
 	}
 
 	/// Returns the byte at the given index.
