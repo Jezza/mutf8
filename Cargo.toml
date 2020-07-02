@@ -1,6 +1,6 @@
 [package]
 name = "mutf8"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Jezza <jezzadabomb@gmail.com>"]
 edition = "2018"
 description = "Basic support for mutf8 strings."
@@ -10,3 +10,12 @@ repository = "https://github.com/Jezza/mutf8"
 keywords = ["mutf8", "string", "encoding", "modified-utf8"]
 
 [dependencies]
+serde = { version = "1.0", optional = true }
+
+[dev-dependencies]
+serde_json = "1.0.53"
+serde = { version = "1.0", features = [ "derive" ] }
+
+[features]
+default = [ "serde" ]
+use-serde = [ "serde" ]
