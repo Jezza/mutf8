@@ -191,7 +191,7 @@ impl mstr {
 				Cow::Borrowed(data)
 			}
 			Cow::Owned(data) => {
-				let data = unsafe { MString::from_mutf8(data) };
+				let data = MString::from_mutf8(data);
 				Cow::Owned(data)
 			}
 		}
@@ -199,7 +199,7 @@ impl mstr {
 
 	pub fn from_mutf8(bytes: &[u8]) -> &mstr {
 		unsafe {
-			std::mem::transmute(bytes)
+			&*(bytes as *const [u8] as *const mstr)
 		}
 	}
 
@@ -343,7 +343,7 @@ impl ToOwned for mstr {
 	type Owned = MString;
 
 	fn to_owned(&self) -> MString {
-		unsafe { MString::from_mutf8(&self.bytes) }
+		MString::from_mutf8(&self.bytes)
 	}
 }
 
