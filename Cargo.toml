@@ -18,5 +18,4 @@ serde = { version = "1.0", features = [ "derive" ] }
 
 [features]
 default = [ "use-structs" ]
-use-serde = [ "serde" ]
 use-structs = []
