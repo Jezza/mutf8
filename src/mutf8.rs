@@ -72,7 +72,7 @@ pub fn utf8_to_mutf8(input: &[u8]) -> Cow<[u8]> {
 			let mut bits: u32 = ((byte1 as u32) & 0x07) << 18;
 			bits += ((byte2 as u32) & 0x3F) << 12;
 			bits += ((byte3 as u32) & 0x3F) << 6;
-			bits += ((byte4 as u32) & 0x3F);
+			bits += (byte4 as u32) & 0x3F;
 
 			// Bits out: 11101101 1010xxxx 10xxxxxx
 			data.push(0xED);

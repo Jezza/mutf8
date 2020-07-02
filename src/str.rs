@@ -28,12 +28,6 @@ impl MString {
 		}
 	}
 
-	pub unsafe fn from_mutf8_unchecked<T: Into<Vec<u8>>>(t: T) -> MString {
-		MString {
-			inner: t.into().into_boxed_slice(),
-		}
-	}
-
 	pub fn into_string(self) -> String {
 		unsafe { String::from_utf8_unchecked(self.into_utf8_bytes()) }
 	}
@@ -186,14 +180,14 @@ impl mstr {
 				Cow::Borrowed(data)
 			}
 			Cow::Owned(data) => {
-				let data = unsafe { MString::from_mutf8(data) };
+				let data = MString::from_mutf8(data);
 				Cow::Owned(data)
 			}
 		}
 	}
 
 	pub fn from_mutf8(bytes: &[u8]) -> &mstr {
-		unsafe { std::mem::transmute(bytes) }
+		unsafe { &*(bytes as *const [u8] as *const mstr) }
 	}
 
 	/// Returns the length of the string, in bytes.
@@ -338,7 +332,7 @@ impl ToOwned for mstr {
 	type Owned = MString;
 
 	fn to_owned(&self) -> MString {
-		unsafe { MString::from_mutf8(&self.bytes) }
+		MString::from_mutf8(&self.bytes)
 	}
 }
 
