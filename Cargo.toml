@@ -1,6 +1,6 @@
 [package]
 name = "mutf8"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Jezza <jezzadabomb@gmail.com>"]
 edition = "2018"
 description = "Basic support for mutf8 strings."
@@ -17,5 +17,6 @@ serde_json = "1.0.53"
 serde = { version = "1.0", features = [ "derive" ] }
 
 [features]
-default = [ "serde" ]
+default = [ "use-structs" ]
 use-serde = [ "serde" ]
+use-structs = []

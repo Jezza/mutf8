@@ -1,19 +1,43 @@
-There's not much going on yet.
-The initial implementation is there.
+# MUTF-8
 
-It currently only supports going from raw mutf8 to utf8, but it's a first step...
+## Usage
 
-There's a couple of goals that I'd want to have done before I count this crate as "ok".
+```rust
+fn main() {
+    let output: Cow<u8> = mutf8::utf8_to_mutf8("Hello, \0World");
 
-* [ ] Support some conversions from utf8 to mutf8.
-* [ ] Add more functionality to try to bring it into line with a normal String/str impl.
+    // `output` contains no NUL bytes.
+}
+```
+
+There's also a `MString` and `mstr` struct.  
+These are the counterparts to `String` and `str` within the standard library.  
+
+```rust
+fn main() {
+    let data = mstr::from_utf8(b"\0");
+	assert_eq!(data.len(), 2);
+}
+```
+
+## About
+This crate allows converting UTF-8 to and from MUTF-8.
+
+Some data formats, such as the JVM classfile, make use of an altered UTF-8 encoding.  
+This one in particular is the MUTF-8 variant.
+
+It allows a NUL byte to be encoded without using the NUL byte itself.  
 
 
-I'll no doubt end up revisiting this list, or even forgetting something as I work on it, so this isn't really a feature list.
-More of a "What I don't forget to write down somewhere".
-I've got a couple of things I want to do with this crate, but the first goal would be to try to find out how I would want to use it.
+## WIP
 
-I have another crate `class_file`.
-It will end up using this crate extensively, and I want to shape this crate to aid that.
+The algorithm itself is done, and useable.  
+It works as well as any other.  
 
-As a second priority, yes, I would want this crate to be the "goto" crate when dealing with mutf8.
+The reason I still call this crate WIP is because of the two String structs.  
+I'm not happy with them.
+
+I do use this crate for a couple of projects, but _none_ of them make use of the structs themselves.  
+
+I typically use this crate as just a jump from a `[u8]` to a `Cow<str>`.  
+So, until I work out where I want to go with this crate, it's probably going to stay like this.
