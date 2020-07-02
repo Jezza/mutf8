@@ -17,14 +17,14 @@ use std::fmt::{
 };
 use std::ops::Deref;
 
-mod conversion;
-
-pub use conversion::mutf8_to_utf8;
-pub use conversion::utf8_to_mutf8;
-
 #[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize, Serializer, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::SeqAccess;
+
+pub use mutf8::mutf8_to_utf8;
+pub use mutf8::utf8_to_mutf8;
+
+mod mutf8;
 
 #[derive(Eq, PartialEq, Hash, Clone)]
 pub struct MString {
@@ -32,12 +32,11 @@ pub struct MString {
 }
 
 impl MString {
-	pub fn from_utf8<T: Into<Vec<u8>>>(t: T) -> MString {
-		let bytes = t.into();
-		let boxed_data = match utf8_to_mutf8(&bytes) {
+	pub fn from_utf8(input: &[u8]) -> MString {
+		let boxed_data = match utf8_to_mutf8(input) {
 			Cow::Borrowed(data) => {
 				// Then we can just consume the input vector.
-				bytes.into_boxed_slice()
+				data.into()
 			}
 			Cow::Owned(data) => {
 				// We need convert the returned vector into a boxed slice
@@ -49,19 +48,9 @@ impl MString {
 		}
 	}
 
-	pub fn from_mutf8<T: Into<Vec<u8>>>(t: T) -> MString {
-		// @FIXME Jezza - 01 Jan. 2019: I guess the only way to verify it is check if there's a nul byte?
-		// I'll just let this sit here, as I have no idea what would be a good idea...
-		// Actually, now that I've thought about it, there is something to check...
-		let data = t.into();
+	pub fn from_mutf8(input: impl Into<Box<[u8]>>) -> MString {
 		MString {
-			inner: data.into_boxed_slice()
-		}
-	}
-
-	pub unsafe fn from_mutf8_unchecked<T: Into<Vec<u8>>>(t: T) -> MString {
-		MString {
-			inner: t.into().into_boxed_slice()
+			inner: input.into(),
 		}
 	}
 
@@ -183,8 +172,7 @@ impl Deref for MString {
 	type Target = mstr;
 
 	fn deref(&self) -> &<Self as Deref>::Target {
-		let data = self.inner.as_ref();
-		mstr::from_mutf8_unchecked(data)
+		mstr::from_mutf8(&self.inner)
 	}
 }
 
@@ -211,19 +199,21 @@ impl mstr {
 	pub fn from_utf8(bytes: &[u8]) -> Cow<mstr> {
 		match utf8_to_mutf8(bytes) {
 			Cow::Borrowed(data) => {
-				let data = mstr::from_mutf8_unchecked(data);
+				let data = mstr::from_mutf8(data);
 				Cow::Borrowed(data)
 			}
 			Cow::Owned(data) => {
-				let data = unsafe { MString::from_mutf8_unchecked(data) };
+				let data = MString::from_mutf8(data);
 				Cow::Owned(data)
 			}
 		}
 	}
 
-	pub fn from_mutf8_unchecked(bytes: &[u8]) -> &mstr {
+	pub fn from_mutf8<'a>(bytes: &'a [u8]) -> &'a mstr {
 		use std::mem::transmute;
-		unsafe { transmute(bytes) }
+		unsafe {
+			transmute(bytes)
+		}
 	}
 
 	/// Returns the length of the string, in bytes.
@@ -366,7 +356,7 @@ impl ToOwned for mstr {
 	type Owned = MString;
 
 	fn to_owned(&self) -> MString {
-		unsafe { MString::from_mutf8_unchecked(&self.bytes) }
+		unsafe { MString::from_mutf8(&self.bytes) }
 	}
 }
 

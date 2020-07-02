@@ -1,14 +1,13 @@
+use serde::{Deserialize, Serialize};
 
-
-use serde::{Serialize, Deserialize};
-use mutf8::{MString, utf8_to_mutf8};
+use mutf8::MString;
 
 #[derive(Serialize, Deserialize)]
 struct Blah(u64, MString, String);
 
 #[test]
 fn test_serialise() {
-	let value = MString::from_utf8("Hello, World!");
+	let value = MString::from_utf8(b"Hello, World!");
 
 	let value = Blah(64, value, String::new());
 
@@ -22,12 +21,12 @@ fn test_deserialise() {
 
 	let output: Blah = serde_json::from_str(&input).unwrap();
 
-	assert_eq!(output.1, MString::from_utf8("Hello, World!"));
+	assert_eq!(output.1, MString::from_utf8(b"Hello, World!"));
 }
 
 #[test]
 fn test_serialise_nul() {
-	let value = MString::from_utf8("Hello, \0World!");
+	let value = MString::from_utf8(b"Hello, \0World!");
 
 	let value = Blah(64, value, String::new());
 
@@ -42,5 +41,5 @@ fn test_deserialise_nul() {
 
 	let output: Blah = serde_json::from_str(&input).unwrap();
 
-	assert_eq!(output.1, MString::from_utf8("Hello, \0World!"));
+	assert_eq!(output.1, MString::from_utf8(b"Hello, \0World!"));
 }
