@@ -1,9 +1,4 @@
-use std::borrow::{
-	Borrow,
-	Cow,
-	ToOwned,
-};
-use std::ops::Deref;
+use std::borrow::Cow;
 
 pub fn utf8_to_mutf8(input: &[u8]) -> Cow<[u8]> {
 	let len = input.len();

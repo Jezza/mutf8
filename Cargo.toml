@@ -1,6 +1,6 @@
 [package]
 name = "mutf8"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["Jezza <jezzadabomb@gmail.com>"]
 edition = "2018"
 description = "Basic support for mutf8 strings."

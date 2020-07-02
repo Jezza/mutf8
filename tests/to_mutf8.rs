@@ -1,6 +1,5 @@
-extern crate mutf8;
-
-use mutf8::{MString, mstr};
+use mutf8::mutf8_to_utf8;
+use mutf8::utf8_to_mutf8;
 
 macro_rules! assert_owned {
     ($var:ident, $msg:expr) => {
@@ -26,7 +25,7 @@ macro_rules! assert_borrowed {
 
 #[test]
 fn ascii_test() {
-	let data = mstr::from_utf8(b"value");
+	let data = utf8_to_mutf8(b"value");
 	assert_eq!(data.len(), 5);
 
 	assert_borrowed!(data, "Data not borrowed. [It's just pure ascii which uses the same encoding as utf8]");
@@ -34,7 +33,7 @@ fn ascii_test() {
 
 #[test]
 fn nul_test() {
-	let data = mstr::from_utf8(b"\0");
+	let data = utf8_to_mutf8(b"\0");
 	assert_eq!(data.len(), 2);
 
 	assert_owned!(data, "Data not owned. [A nul byte needs two bytes in mutf8]");

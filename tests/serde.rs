@@ -1,12 +1,12 @@
+#![cfg(all(feature = "use-structs", feature = "serde"))]
+
 use serde::{Serialize, Deserialize};
 use mutf8::{MString, utf8_to_mutf8};
 
 #[derive(Serialize, Deserialize)]
-#[cfg(feature = "serde")]
 struct Blah(u64, MString, String);
 
 #[test]
-#[cfg(feature = "serde")]
 fn test_serialise() {
 	let value = MString::from_utf8("Hello, World!");
 
@@ -17,7 +17,6 @@ fn test_serialise() {
 }
 
 #[test]
-#[cfg(feature = "serde")]
 fn test_deserialise() {
 	let input = r#"[64,[72,101,108,108,111,44,32,87,111,114,108,100,33],""]"#;
 
@@ -27,7 +26,6 @@ fn test_deserialise() {
 }
 
 #[test]
-#[cfg(feature = "serde")]
 fn test_serialise_nul() {
 	let value = MString::from_utf8("Hello, \0World!");
 
@@ -38,7 +36,6 @@ fn test_serialise_nul() {
 }
 
 #[test]
-#[cfg(feature = "serde")]
 fn test_deserialise_nul() {
 
 	let input = r#"[64,[72,101,108,108,111,44,32,192,128,87,111,114,108,100,33],""]"#;

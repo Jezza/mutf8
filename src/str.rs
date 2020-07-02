@@ -28,30 +28,19 @@ pub struct MString {
 }
 
 impl MString {
-	pub fn from_utf8<T: Into<Vec<u8>>>(t: T) -> MString {
-		let bytes = t.into();
-		let boxed_data = match utf8_to_mutf8(&bytes) {
-			Cow::Borrowed(data) => {
-				// Then we can just consume the input vector.
-				bytes.into_boxed_slice()
-			}
-			Cow::Owned(data) => {
-				// We need convert the returned vector into a boxed slice
-				data.into_boxed_slice()
-			}
+	pub fn from_utf8(input: &[u8]) -> MString {
+		let boxed_data = match utf8_to_mutf8(input) {
+			Cow::Borrowed(_data) => input.into(),
+			Cow::Owned(data) => data.into_boxed_slice(),
 		};
 		MString {
 			inner: boxed_data
 		}
 	}
 
-	pub fn from_mutf8<T: Into<Vec<u8>>>(t: T) -> MString {
-		// @FIXME Jezza - 01 Jan. 2019: I guess the only way to verify it is check if there's a nul byte?
-		// I'll just let this sit here, as I have no idea what would be a good idea...
-		// Actually, now that I've thought about it, there is something to check...
-		let data = t.into();
+	pub fn from_mutf8(input: impl Into<Box<[u8]>>) -> MString {
 		MString {
-			inner: data.into_boxed_slice()
+			inner: input.into(),
 		}
 	}
 
@@ -76,24 +65,16 @@ impl MString {
 	pub fn into_utf8_bytes(self) -> Vec<u8> {
 		let bytes = self.into_inner();
 		match mutf8_to_utf8(&bytes) {
-			Cow::Borrowed(data) => {
-				bytes.into_vec()
-			}
-			Cow::Owned(data) => {
-				data
-			}
+			Cow::Borrowed(_data) => bytes.into_vec(),
+			Cow::Owned(data) => data,
 		}
 	}
 
 	pub fn into_boxed_utf8_bytes(self) -> Box<[u8]> {
 		let bytes = self.into_inner();
 		match mutf8_to_utf8(&bytes) {
-			Cow::Borrowed(data) => {
-				bytes
-			}
-			Cow::Owned(data) => {
-				data.into_boxed_slice()
-			}
+			Cow::Borrowed(_data) => bytes,
+			Cow::Owned(data) => data.into_boxed_slice(),
 		}
 	}
 
@@ -179,8 +160,7 @@ impl Deref for MString {
 	type Target = mstr;
 
 	fn deref(&self) -> &<Self as Deref>::Target {
-		let data = self.inner.as_ref();
-		mstr::from_mutf8_unchecked(data)
+		mstr::from_mutf8(&self.inner)
 	}
 }
 
@@ -207,19 +187,20 @@ impl mstr {
 	pub fn from_utf8(bytes: &[u8]) -> Cow<mstr> {
 		match utf8_to_mutf8(bytes) {
 			Cow::Borrowed(data) => {
-				let data = mstr::from_mutf8_unchecked(data);
+				let data = mstr::from_mutf8(data);
 				Cow::Borrowed(data)
 			}
 			Cow::Owned(data) => {
-				let data = unsafe { MString::from_mutf8_unchecked(data) };
+				let data = unsafe { MString::from_mutf8(data) };
 				Cow::Owned(data)
 			}
 		}
 	}
 
-	pub fn from_mutf8_unchecked(bytes: &[u8]) -> &mstr {
-		use std::mem::transmute;
-		unsafe { transmute(bytes) }
+	pub fn from_mutf8(bytes: &[u8]) -> &mstr {
+		unsafe {
+			std::mem::transmute(bytes)
+		}
 	}
 
 	/// Returns the length of the string, in bytes.
@@ -362,7 +343,7 @@ impl ToOwned for mstr {
 	type Owned = MString;
 
 	fn to_owned(&self) -> MString {
-		unsafe { MString::from_mutf8_unchecked(&self.bytes) }
+		unsafe { MString::from_mutf8(&self.bytes) }
 	}
 }
 

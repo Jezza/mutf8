@@ -6,14 +6,14 @@
 
 mod mutf8;
 
-#[feature("use-structs")]
+#[cfg(feature = "use-structs")]
 mod str;
 
 pub use mutf8::mutf8_to_utf8;
 pub use mutf8::utf8_to_mutf8;
 
-#[feature("use-structs")]
+#[cfg(feature = "use-structs")]
 pub use crate::str::MString;
 
-#[feature("use-structs")]
+#[cfg(feature = "use-structs")]
 pub use crate::str::mstr;
