@@ -21,7 +21,8 @@ macro_rules! assert_borrowed {
 
 #[test]
 fn ascii_test() {
-	let data = utf8_to_mutf8(b"value");
+	let data = utf8_to_mutf8(b"value")
+		.expect("invalid input");
 	assert_eq!(data.len(), 5);
 
 	assert_borrowed!(
@@ -32,7 +33,8 @@ fn ascii_test() {
 
 #[test]
 fn nul_test() {
-	let data = utf8_to_mutf8(b"\0");
+	let data = utf8_to_mutf8(b"\0")
+		.expect("invalid input");
 	assert_eq!(data.len(), 2);
 
 	assert_owned!(

@@ -1,12 +1,14 @@
 use std::borrow::{Borrow, Cow, ToOwned};
+use std::convert::TryFrom;
 use std::fmt::{Debug, Display, Formatter, Result as FResult};
 use std::ops::Deref;
 
-use crate::mutf8_to_utf8;
-use crate::utf8_to_mutf8;
-
 #[cfg(feature = "serde")]
 use serde::{de::SeqAccess, Deserialize, Deserializer, Serialize, Serializer};
+
+use crate::error::{Result as MResult, Error as MError};
+use crate::mutf8_to_utf8;
+use crate::utf8_to_mutf8;
 
 #[derive(Eq, PartialEq, Hash, Clone)]
 pub struct MString {
@@ -14,12 +16,12 @@ pub struct MString {
 }
 
 impl MString {
-	pub fn from_utf8(input: &[u8]) -> MString {
-		let boxed_data = match utf8_to_mutf8(input) {
+	pub fn from_utf8(input: &[u8]) -> MResult<MString> {
+		let boxed_data = match utf8_to_mutf8(input)? {
 			Cow::Borrowed(_data) => input.into(),
 			Cow::Owned(data) => data.into_boxed_slice(),
 		};
-		MString { inner: boxed_data }
+		Ok(MString { inner: boxed_data })
 	}
 
 	pub fn from_mutf8(input: impl Into<Box<[u8]>>) -> MString {
@@ -28,46 +30,60 @@ impl MString {
 		}
 	}
 
-	pub fn into_string(self) -> String {
-		unsafe { String::from_utf8_unchecked(self.into_utf8_bytes()) }
+	pub fn into_string(self) -> MResult<String> {
+		Ok(String::from_utf8(self.into_utf8_bytes()?)?)
 	}
 
+	#[inline]
 	pub fn into_mutf8_bytes(self) -> Vec<u8> {
-		self.into_boxed_mutf8_bytes().into_vec()
+		self.into_inner().into_vec()
 	}
 
+	#[inline]
 	pub fn into_boxed_mutf8_bytes(self) -> Box<[u8]> {
 		self.into_inner()
 	}
 
-	pub fn into_utf8_bytes(self) -> Vec<u8> {
+	pub fn into_utf8_bytes(self) -> MResult<Vec<u8>> {
 		let bytes = self.into_inner();
-		match mutf8_to_utf8(&bytes) {
+		Ok(match mutf8_to_utf8(&bytes)? {
 			Cow::Borrowed(_data) => bytes.into_vec(),
 			Cow::Owned(data) => data,
-		}
+		})
 	}
 
-	pub fn into_boxed_utf8_bytes(self) -> Box<[u8]> {
+	pub fn into_boxed_utf8_bytes(self) -> MResult<Box<[u8]>> {
 		let bytes = self.into_inner();
-		match mutf8_to_utf8(&bytes) {
+		Ok(match mutf8_to_utf8(&bytes)? {
 			Cow::Borrowed(_data) => bytes,
 			Cow::Owned(data) => data.into_boxed_slice(),
-		}
+		})
 	}
 
 	pub fn as_mstr(&self) -> &mstr {
 		self
 	}
 
-	pub fn into_boxed_str(self) -> Box<str> {
-		unsafe { Box::from_raw(Box::into_raw(self.into_boxed_utf8_bytes()) as *mut str) }
+	pub fn into_boxed_str(self) -> MResult<Box<str>> {
+		let bytes = self.into_boxed_utf8_bytes()?;
+		let _ = std::str::from_utf8(&bytes)?;
+
+		// safety: We check if the data is valid UTF8 above.
+		unsafe {
+			Ok(std::str::from_boxed_utf8_unchecked(bytes))
+		}
 	}
 
 	pub fn into_boxed_mstr(self) -> Box<mstr> {
-		unsafe { Box::from_raw(Box::into_raw(self.into_boxed_mutf8_bytes()) as *mut mstr) }
+		let boxed = self.into_inner();
+
+		// safety: Any conversion operation on mstr is checked, just as MString is checked.
+		unsafe {
+			Box::from_raw(Box::into_raw(boxed) as *mut mstr)
+		}
 	}
 
+	#[inline]
 	fn into_inner(self) -> Box<[u8]> {
 		let result = unsafe {
 			use std::ptr::read;
@@ -84,17 +100,14 @@ impl MString {
 		&self.inner
 	}
 
-	pub fn as_utf8_bytes(&self) -> Cow<[u8]> {
+	pub fn as_utf8_bytes(&self) -> MResult<Cow<[u8]>> {
 		mutf8_to_utf8(&self.inner)
 	}
 }
 
 #[cfg(feature = "serde")]
 impl Serialize for MString {
-	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-	where
-		S: Serializer,
-	{
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
 		serializer.serialize_bytes(&self.inner)
 	}
 }
@@ -110,9 +123,16 @@ impl<'de> serde::de::Visitor<'de> for MStringVisitor {
 		formatter.write_str("mutf8 bytes")
 	}
 
+	fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+		where
+			E: serde::de::Error,
+	{
+		Ok(MString::from_mutf8(v))
+	}
+
 	fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-	where
-		A: SeqAccess<'de>,
+		where
+			A: SeqAccess<'de>,
 	{
 		let mut data = vec![];
 		while let Some(val) = seq.next_element::<u8>()? {
@@ -120,21 +140,11 @@ impl<'de> serde::de::Visitor<'de> for MStringVisitor {
 		}
 		Ok(MString::from_mutf8(data))
 	}
-
-	fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-	where
-		E: serde::de::Error,
-	{
-		Ok(MString::from_mutf8(v))
-	}
 }
 
 #[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for MString {
-	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-	where
-		D: Deserializer<'de>,
-	{
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
 		deserializer.deserialize_bytes(MStringVisitor)
 	}
 }
@@ -165,9 +175,11 @@ impl Display for MString {
 	}
 }
 
-impl From<MString> for Vec<u8> {
+impl TryFrom<MString> for Vec<u8> {
+	type Error = MError;
+
 	#[inline]
-	fn from(s: MString) -> Vec<u8> {
+	fn try_from(s: MString) -> MResult<Vec<u8>> {
 		s.into_utf8_bytes()
 	}
 }
@@ -179,8 +191,8 @@ pub struct mstr {
 }
 
 impl mstr {
-	pub fn from_utf8(bytes: &[u8]) -> Cow<mstr> {
-		match utf8_to_mutf8(bytes) {
+	pub fn from_utf8(bytes: &[u8]) -> MResult<Cow<mstr>> {
+		let cow = match utf8_to_mutf8(bytes)? {
 			Cow::Borrowed(data) => {
 				let data = mstr::from_mutf8(data);
 				Cow::Borrowed(data)
@@ -189,11 +201,16 @@ impl mstr {
 				let data = MString::from_mutf8(data);
 				Cow::Owned(data)
 			}
-		}
+		};
+
+		Ok(cow)
 	}
 
 	pub fn from_mutf8(bytes: &[u8]) -> &mstr {
-		unsafe { &*(bytes as *const [u8] as *const mstr) }
+		// Safety: all conversions that go from mstr/MString to a utf8 string return an error if the bytes are invalid utf8.
+		unsafe {
+			&*(bytes as *const [u8] as *const mstr)
+		}
 	}
 
 	/// Returns the length of the string, in bytes.
@@ -226,32 +243,30 @@ impl mstr {
 		self.bytes.as_ptr()
 	}
 
-	pub fn to_str(&self) -> Cow<str> {
+	pub fn to_str(&self) -> MResult<Cow<str>> {
 		self.to_utf8()
 	}
 
-	pub fn to_utf8(&self) -> Cow<str> {
+	pub fn to_utf8(&self) -> MResult<Cow<str>> {
 		let input = &self.bytes;
 
 		// @FIXME Jezza - 01 Jan. 2019: Eh, I don't know if I like this solution...
 		// I like separating all of the mutf8 -> utf8 code, but destructuring the Cow like this...
-		match mutf8_to_utf8(input) {
-			Cow::Borrowed(data) => {
-				use std::str::from_utf8_unchecked;
-				let output = unsafe { from_utf8_unchecked(data) };
-				Cow::Borrowed(output)
-			}
-			Cow::Owned(data) => {
-				let output = unsafe { String::from_utf8_unchecked(data) };
-				Cow::Owned(output)
-			}
-		}
+		let data = match mutf8_to_utf8(input)? {
+			Cow::Borrowed(data) => Cow::Borrowed(std::str::from_utf8(data)?),
+			Cow::Owned(data) => Cow::Owned(String::from_utf8(data)?),
+		};
+
+		Ok(data)
 	}
 
 	pub fn into_m_string(self: Box<mstr>) -> MString {
-		let raw = Box::into_raw(self) as *mut [u8];
+		let inner = unsafe {
+			Box::from_raw(Box::into_raw(self) as *mut [u8])
+		};
+
 		MString {
-			inner: unsafe { Box::from_raw(raw) },
+			inner,
 		}
 	}
 
@@ -358,12 +373,14 @@ impl AsRef<mstr> for MString {
 
 impl Debug for mstr {
 	fn fmt(&self, f: &mut Formatter<'_>) -> FResult {
-		Debug::fmt(self.to_utf8().as_ref(), f)
+		let lossy = std::string::String::from_utf8_lossy(self.as_bytes());
+		Debug::fmt(&lossy, f)
 	}
 }
 
 impl Display for mstr {
 	fn fmt(&self, f: &mut Formatter<'_>) -> FResult {
-		Display::fmt(self.to_utf8().as_ref(), f)
+		let lossy = std::string::String::from_utf8_lossy(self.as_bytes());
+		Display::fmt(&lossy, f)
 	}
 }

@@ -1,9 +1,11 @@
+use crate::error::{Result, Error, Mode, Expected, Position};
+
 use std::borrow::Cow;
 
-pub fn utf8_to_mutf8(input: &[u8]) -> Cow<[u8]> {
+pub fn utf8_to_mutf8(input: &[u8]) -> Result<Cow<[u8]>> {
 	let len = input.len();
 	if len == 0 {
-		return Cow::Borrowed(input);
+		return Ok(Cow::Borrowed(input));
 	}
 
 	const MODE_BORROW: u8 = 0;
@@ -37,7 +39,7 @@ pub fn utf8_to_mutf8(input: &[u8]) -> Cow<[u8]> {
 			// 2-byte encoding
 			if mode == MODE_COPY {
 				data.push(byte1);
-				let byte2 = *input.get(i).unwrap_or(&0);
+				let byte2 = *input.get(i).ok_or(Error::EndOfInput(Mode::Encoding, Expected::TwoByte, Position::Two))?;
 				i += 1;
 				data.push(byte2);
 			}
@@ -45,10 +47,10 @@ pub fn utf8_to_mutf8(input: &[u8]) -> Cow<[u8]> {
 			// 3-byte encoding
 			if mode == MODE_COPY {
 				data.push(byte1);
-				let byte2 = *input.get(i).unwrap_or(&0);
+				let byte2 = *input.get(i).ok_or(Error::EndOfInput(Mode::Encoding, Expected::ThreeByte, Position::Two))?;
 				i += 1;
 				data.push(byte2);
-				let byte3 = *input.get(i).unwrap_or(&0);
+				let byte3 = *input.get(i).ok_or(Error::EndOfInput(Mode::Encoding, Expected::ThreeByte, Position::Three))?;
 				i += 1;
 				data.push(byte3);
 			}
@@ -61,11 +63,11 @@ pub fn utf8_to_mutf8(input: &[u8]) -> Cow<[u8]> {
 
 			// Beginning of 4-byte encoding, turn into 2 3-byte encodings
 			// Bits in: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
-			let byte2 = *input.get(i).unwrap_or(&0);
+			let byte2 = *input.get(i).ok_or(Error::EndOfInput(Mode::Encoding, Expected::FourByte, Position::Two))?;
 			i += 1;
-			let byte3 = *input.get(i).unwrap_or(&0);
+			let byte3 = *input.get(i).ok_or(Error::EndOfInput(Mode::Encoding, Expected::FourByte, Position::Three))?;
 			i += 1;
-			let byte4 = *input.get(i).unwrap_or(&0);
+			let byte4 = *input.get(i).ok_or(Error::EndOfInput(Mode::Encoding, Expected::FourByte, Position::Four))?;
 			i += 1;
 
 			// Reconstruct full 21-bit value
@@ -86,17 +88,19 @@ pub fn utf8_to_mutf8(input: &[u8]) -> Cow<[u8]> {
 		}
 	}
 
-	if mode == MODE_BORROW {
+	let cow = if mode == MODE_BORROW {
 		Cow::Borrowed(input)
 	} else {
 		Cow::Owned(data)
-	}
+	};
+
+	Ok(cow)
 }
 
-pub fn mutf8_to_utf8(input: &[u8]) -> Cow<[u8]> {
+pub fn mutf8_to_utf8(input: &[u8]) -> Result<Cow<[u8]>> {
 	let len = input.len();
 	if len == 0 {
-		return Cow::Borrowed(input);
+		return Ok(Cow::Borrowed(input));
 	}
 
 	const MODE_BORROW: u8 = 0;
@@ -124,7 +128,7 @@ pub fn mutf8_to_utf8(input: &[u8]) -> Cow<[u8]> {
 			// Mask out the three bits so we can check if it's equal to the marker bits that say this is a 2 byte encoding.
 			// 0b11100000 = 0xE0
 			// 0b11000000 = 0xC0
-			let byte2 = *input.get(i).unwrap_or(&0);
+			let byte2 = *input.get(i).ok_or(Error::EndOfInput(Mode::Decoding, Expected::TwoByte, Position::Two))?;
 			i += 1;
 			//				println!("Bytes: {:x} {:x}", byte1, byte2);
 
@@ -145,17 +149,17 @@ pub fn mutf8_to_utf8(input: &[u8]) -> Cow<[u8]> {
 			}
 		} else if byte1 & 0xF0 == 0xE0 {
 			// 3 byte encoding
-			let byte2 = *input.get(i).unwrap_or(&0);
+			let byte2 = *input.get(i).ok_or(Error::EndOfInput(Mode::Decoding, Expected::ThreeByte, Position::Two))?;
 			i += 1;
-			let byte3 = *input.get(i).unwrap_or(&0);
+			let byte3 = *input.get(i).ok_or(Error::EndOfInput(Mode::Decoding, Expected::ThreeByte, Position::Three))?;
 			i += 1;
 			//				println!("{:x} {:x} {:x}", byte1, byte2, byte3);
 			if i + 2 < len && byte1 == 0xED && byte2 & 0xF0 == 0xA0 {
 				// Check if pair encoding...
 
-				let byte4 = *input.get(i).unwrap_or(&0);
-				let byte5 = *input.get(i + 1).unwrap_or(&0);
-				let byte6 = *input.get(i + 2).unwrap_or(&0);
+				let byte4 = *input.get(i).ok_or(Error::EndOfInput(Mode::Decoding, Expected::SixByte, Position::Four))?;
+				let byte5 = *input.get(i + 1).ok_or(Error::EndOfInput(Mode::Decoding, Expected::SixByte, Position::Five))?;
+				let byte6 = *input.get(i + 2).ok_or(Error::EndOfInput(Mode::Decoding, Expected::SixByte, Position::Six))?;
 
 				//					println!("{:x} {:x} {:x}", byte4, byte5, byte6);
 				if byte4 == 0xED && byte5 & 0xF0 == 0xB0 {
@@ -195,9 +199,11 @@ pub fn mutf8_to_utf8(input: &[u8]) -> Cow<[u8]> {
 		}
 	}
 
-	if mode == MODE_BORROW {
+	let cow = if mode == MODE_BORROW {
 		Cow::Borrowed(input)
 	} else {
 		Cow::Owned(data)
-	}
+	};
+
+	Ok(cow)
 }
